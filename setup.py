@@ -1,6 +1,6 @@
 from setuptools import setup, Extension
 
-PairwiseModule = Extension('Pairwise', sources = ['library.cpp'],
+PairwiseModule = Extension('Pairwise', sources = ['PairwiseDistances.cpp'],
 						   extra_compile_args = ["-fopenmp", "-lm"],
 						   extra_link_args = ["-fopenmp", "-lm"])
 

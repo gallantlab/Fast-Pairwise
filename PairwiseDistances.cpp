@@ -1,4 +1,4 @@
-#include "library.h"
+#include "PairwiseDistances.h"
 
 #include <iostream>
 using namespace std;
