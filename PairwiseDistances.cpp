@@ -123,13 +123,7 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	PyArrayObject *outArray = (PyArrayObject*)PyArray_FROM_OTF(out, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
 
 	if (itemArray == nullptr || outArray == nullptr) // || sizeArray == nullptr)
-	{
-		cout << "null" << endl;
 		return nullptr;
-	}
-
-	cout << "cast" << endl;
-
 	// get dimensions of the input array
 	npy_intp *dims = PyArray_DIMS(itemArray);
 	unsigned long long numItems = dims[0];
@@ -150,7 +144,6 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		{
 			unsigned long long index = numItems * i - (i * (i + 1)) / 2 + j - 1 - i;
 			double d = DistanceFunction(itemArray, i, j, numFeatures);
-//			cout << i << " " << j << " " << index << " " << d << endl;
 			*((double*)PyArray_GETPTR1(outArray, index)) = d;
 		}
 	}
@@ -163,8 +156,6 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		*((double*)PyArray_GETPTR1(outArray, i)) = DistanceFunction(itemArray, row, col, numFeatures);
 	}
 #endif
-
-	cout << "loop done" << endl;
 
 	Py_RETURN_NONE;
 }
