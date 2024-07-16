@@ -4,8 +4,6 @@ To install:
 ``python3 setup.py install --user``
 
 Currently provides correlation, euclidean, and random forest distances. 
-Correlation has a 2nd version - `FastCorrelation` - in which the correlation is calculated on a single pass. 
-This is faster (the regular version needs 2 passes) but likely to be numerically less stable.
 
 To use:
 
@@ -13,8 +11,9 @@ assuming `data` is a 2D numpy array in which the first index is samples and the 
 ````
 n = data.shape[0]
 out = numpy.zeros(int(n * (n - 1) / 2))
-Pairwise.GetPairwise[Euclidean|Correlation|FastCorrelation|RandomForest]Distance(data, out)
+Pairwise.GetPairwise[Euclidean|Correlation|RandomForest]Distance(data, out)
 ````
 `out` will then contain the same data as returned by `pdist`
 
-The actual math is slower than numpy, but thanks to the number of cores, this is faster on larger arrays.
+The actual math is slower than numpy, but thanks to mulithreading, this is faster on larger arrays. 
+All and all the complexity is still O(n^2), but this gives you a better multiplier.
