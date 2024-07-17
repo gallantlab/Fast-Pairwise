@@ -81,24 +81,25 @@ static struct PyModuleDef moduleDefinition = {PyModuleDef_HEAD_INIT,
  * @return nullptr
  */
 
-static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(PyArrayObject* items, int i, int j, int length),
+static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(PyArrayObject*, int, int, int, const double*),
 									 NPY_TYPES arrayType);
 
 /**
  * Distance functions with the following signature
- * @param items		numpy array from the actual objects
- * @param i			index of first item in pair
- * @param j			index of second item in pair
- * @param length	length of these vectors
+ * @param items			numpy array from the actual objects
+ * @param i				index of first item in pair
+ * @param j				index of second item in pair
+ * @param length		length of these vectors
+ * @param meanSqaures	mean square of each entry, only used by Correlation, but shared for signature consistency in function pointer
  * @return	distance between the pairs
  */
 
 
-static double Euclidean(PyArrayObject* items, int i, int j, int length);
+static double Euclidean(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
 
-static double RandomForest(PyArrayObject* items, int i, int j, int length);
+static double RandomForest(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
 
-static double Correlation(PyArrayObject* items, int i, int j, int length);
+static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
 
 
 /**

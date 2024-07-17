@@ -10,7 +10,7 @@ PyMODINIT_FUNC PyInit_Pairwise(void)
 	return PyModule_Create(&moduleDefinition);
 }
 
-static double Euclidean(PyArrayObject* items, int i, int j, int length)
+static double Euclidean(PyArrayObject* items, int i, int j, int length, const double*)
 {
 	double dist = 0.0;
 	for (int k = 0; k < length; k++)
@@ -22,7 +22,7 @@ static double Euclidean(PyArrayObject* items, int i, int j, int length)
 	return sqrt(dist);
 }
 
-static double RandomForest(PyArrayObject* items, int i, int j, int length)
+static double RandomForest(PyArrayObject* items, int i, int j, int length, const double*)
 {
 	double count = 0.0;
 	for (int c = 0; c < length; c++)
@@ -34,9 +34,13 @@ static double RandomForest(PyArrayObject* items, int i, int j, int length)
 	return 1 - count / length;
 }
 
-static double Correlation(PyArrayObject* items, int i, int j, int length)
+static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSquares)
 {
 	// two-pass algo as used in scipy.spatial.distance
+	// the commented out stuff are factored out to reduce complexity
+	// but kept here to show the algorithm
+
+	/*
 	double Xmean = 0.0, Ymean = 0.0;
 	for (int k = 0; k < length; k++)
 	{
@@ -44,23 +48,24 @@ static double Correlation(PyArrayObject* items, int i, int j, int length)
 		Ymean += GET_ARRAY2D(items, j, k);
 	}
 	Xmean /= (double)length; Ymean /= (double)length;
+	 */
 
 	double sumXY = 0.0,
-			sumX2 = 0.0,
-			sumY2 = 0.0;
+			meanX2 = meanSquares[i],
+			meanY2 = meanSquares[j];
 
 	for (int k = 0; k < length; k++)
 	{
-		double x = GET_ARRAY2D(items, i, k) - Xmean;
-		double y = GET_ARRAY2D(items, j, k) - Ymean;
+		double x = GET_ARRAY2D(items, i, k) /*- Xmean*/;
+		double y = GET_ARRAY2D(items, j, k) /*- Ymean*/;
 
-		sumX2 += x * x;
-		sumY2 += y * y;
-		sumXY += x * y;
+	/*	meanX2 += x * x;
+		meanY2 += y * y;
+	*/	sumXY += x * y;
 	}
-	sumXY /= (double)length; sumX2 /= (double)length; sumY2 /= (double)length;
+	sumXY /= (double)length; /*meanX2 /= (double)length; meanY2 /= (double)length;*/
 
-	return 1.0 - sumXY / sqrt(sumX2 * sumY2);
+	return 1.0 - sumXY / sqrt(meanX2 * meanY2);
 }
 
 
@@ -80,7 +85,7 @@ static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args)
 	return GetPairwiseDistance(args, &Correlation, NPY_DOUBLE);
 }
 
-static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(PyArrayObject*, int i, int j, int length),
+static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(PyArrayObject*, int, int, int, const double*),
 									 NPY_TYPES arrayType)
 {
 	// == Read in the arguments as a generic python object and an int
@@ -103,9 +108,36 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	unsigned long long numItems = dims[0];
 	unsigned int numFeatures = dims[1];
 
-#ifdef REVERSE_INDEX
-	unsigned long long numCondensed = numItems * (numItems - 1) / 2;
-#endif
+	// de-mean correlation - doing it within the main loop would be O(n^2) demean ops, whereas
+	// doing it here is a O(n) demean ops
+	double *meanSquares = nullptr;
+	double *rawDemeaned = nullptr;
+	if (DistanceFunction == &Correlation)
+	{
+		rawDemeaned = new double[numItems * numFeatures];	// numpy stores these arrays as 1D
+		meanSquares = new double[numItems];
+
+		#pragma omp parallel for
+		for (unsigned long i = 0; i < numItems; i++)
+		{
+			double mean = 0.0;
+			meanSquares[i] = 0.0;
+			for (unsigned int j = 0; j < numFeatures; j++)
+				mean += GET_ARRAY2D(itemArray, i, j);
+			mean /= (double)numFeatures;
+
+			for (unsigned int j = 0; j < numFeatures; j++)
+			{
+				double val = GET_ARRAY2D(itemArray, i, j) - mean;
+				rawDemeaned[i * numFeatures + j] = val;
+				meanSquares[i] += val * val;
+			}
+			meanSquares[i] /= (double)numFeatures;
+		}
+
+		// and then we operate on this demeaned array
+		itemArray = (PyArrayObject*)PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, rawDemeaned);
+	}
 
 #ifndef REVERSE_INDEX
 	#pragma omp parallel for
@@ -115,11 +147,12 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		if (i < j)
 		{
 			unsigned long long index = numItems * i - (i * (i + 1)) / 2 + j - 1 - i;
-			double d = DistanceFunction(itemArray, i, j, numFeatures);
+			double d = DistanceFunction(itemArray, i, j, numFeatures, meanSquares);
 			*((double*)PyArray_GETPTR1(outArray, index)) = d;
 		}
 	}
 #else
+	unsigned long long numCondensed = numItems * (numItems - 1) / 2;
 	Indexer *indexer = new Indexer(numItems);
 
 	#pragma omp parallel for
@@ -127,11 +160,20 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	{
 		unsigned int row = indexer->RowIndex(i);
 		unsigned int col = indexer->ColIndex(i, row);
-		*((double*)PyArray_GETPTR1(outArray, i)) = DistanceFunction(itemArray, row, col, numFeatures);
+		*((double*)PyArray_GETPTR1(outArray, i)) = DistanceFunction(itemArray, row, col, numFeatures, meanSquares);
 	}
 
 	delete indexer;
 #endif
+
+	// clean up stuff used for correlation
+	if (DistanceFunction == &Correlation)
+	{
+		delete [] meanSquares;
+		itemArray->~tagPyArrayObject();
+		delete [] rawDemeaned;
+	}
+
 
 	Py_RETURN_NONE;
 }
