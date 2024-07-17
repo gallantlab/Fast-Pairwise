@@ -39,13 +39,25 @@ static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args);
 static PyMethodDef PythonDistanceMethods[] =
 	{
 		{"GetPairwiseRandomForestDistance", &GetPairwiseRandomForestDistance, METH_VARARGS,
-		 "GetPairwiseRandomForestDistance(items, out)"},
+		 "GetPairwiseRandomForestDistance(items, out)\n"
+		 "Gets the pairwise random forest distance between items, i.e. the fraction of the forest in which the pair of\n"
+		 "items fell into the same leaf node\n"
+		 "@param items:	a 2d [nItems, nFeatures] numpy array\n"
+		 "@param out:	an empty 1d array of size (nItems * (nItems - 1) / 2) for the output condensed distance matrix\n"},
+
 		{"GetPairwiseEuclideanDistance", &GetPairwiseEuclideanDistance,       METH_VARARGS,
-			"GetPairwiseEuclideanDistance(items, out)"},
+			"GetPairwiseEuclideanDistance(items, out)\n"
+			"Gets the pairwise euclidean distance between items\n"
+			"items fell into the same leaf node\n"
+			"@param items:	a 2d [nItems, nFeatures] numpy array\n"
+			"@param out:	an empty 1d array of size (nItems * (nItems - 1) / 2) for the output condensed distance matrix\n"},
+
 		{"GetPairwiseCorrelationDistance", &GetPairwiseCorrelationDistance, METH_VARARGS,
-			"GetPairwiseCorrelationDistance(items, out)"},
-			{"GetPairwiseFastCorrelationDistance", &GetPairwiseFastCorrelationDistance, METH_VARARGS,
-			"GetPairwiseFastCorrelationDistance(items, out)"},
+			"GetPairwiseCorrelationDistance(items, out)\n"
+			"Gets the pairwise correlation distance between items\n"
+			"items fell into the same leaf node\n"
+			"@param items:	a 2d [nItems, nFeatures] numpy array\n"
+			"@param out:	an empty 1d array of size (nItems * (nItems - 1) / 2) for the output condensed distance matrix\n"},
 		{NULL, NULL, 0,     NULL}
 	};
 
