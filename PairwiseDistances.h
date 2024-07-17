@@ -141,7 +141,7 @@ static int ColIndex(unsigned long long condensed, unsigned int rowIndex, unsigne
  * Indexing with pre-computed LUTs to save smol math ops. To minimize calculations,
  * call RowIndex first, store the value, and call ColIndex with it.
  * The solution from stackoverflow requires a sqrt, a ceil, and a double-to-int cast per condensed index.
- * The indexer only uses comparison and addition/subtraction on ints
+ * The indexer only uses comparison and addition/subtraction/division on ints
  */
 class Indexer
 {

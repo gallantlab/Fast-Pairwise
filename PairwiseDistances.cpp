@@ -85,7 +85,9 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 {
 	// == Read in the arguments as a generic python object and an int
 	PyObject *items;	// this should be the array that is passed to us
-	PyObject *out;			// number of values in the condensed distance array should be computed in numpy because large factorial
+	PyObject *out;		// output array because the number of values in the condensed distance array
+						// is a large factorial that can exceed npy_intp, and thus it's easier to
+						// allocate the output in python first
 
 	if (!PyArg_ParseTuple(args, "OO", &items, &out))	// "O" means object, 'i' means integer
 		return nullptr;
