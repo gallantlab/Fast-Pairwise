@@ -118,14 +118,63 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		}
 	}
 #else
+	Indexer *indexer = new Indexer(numItems);
+
 	#pragma omp parallel for
 	for (unsigned long i = 0; i < numCondensed; i ++)
 	{
-		int row = RowIndex(i, numItems);
-		int col = ColIndex(i, row, numItems);
+		unsigned int row = indexer->RowIndex(i);
+		unsigned int col = indexer->ColIndex(i, row);
 		*((double*)PyArray_GETPTR1(outArray, i)) = DistanceFunction(itemArray, row, col, numFeatures);
 	}
+
+	delete indexer;
 #endif
 
 	Py_RETURN_NONE;
 }
+
+#ifdef  REVERSE_INDEX
+Indexer::Indexer(unsigned long nItems)
+{
+	this->nItems = nItems;
+	this->itemsToRow = new unsigned long[nItems];
+	this->itemsToRow[0] = 0;
+
+	// compute LUT
+	unsigned int thisRow;
+	for (unsigned long i = 1; i < nItems; i++)
+	{
+		thisRow = nItems - i;
+		this->itemsToRow[i] = this->itemsToRow[i - 1] + thisRow;
+	}
+}
+
+Indexer::~Indexer()
+{
+	delete [] this->itemsToRow;
+}
+
+
+unsigned long Indexer::RowIndex(unsigned long long condensed) const
+{
+	long center;
+	long left = 0;
+	long right = nItems - 2;
+	while (left < right)
+	{
+		center = (left + right) / 2;
+		if (itemsToRow[center + 1] <= condensed)
+			left = center + 1;
+		else
+			right = center;
+	}
+	return left;
+}
+
+unsigned long Indexer::ColIndex(unsigned long long condensed, unsigned int row) const
+{
+	return (row + 1) + (condensed - this->itemsToRow[row]);
+}
+
+#endif
