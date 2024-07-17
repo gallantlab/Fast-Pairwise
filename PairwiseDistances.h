@@ -105,8 +105,8 @@ static double Correlation(PyArrayObject* items, int i, int j, int length);
 * Shorthand macros for getting doubles from arrays
 */
 
-#define GET_ARRAY1D(arr, i) *(double*)PyArray_GETPTR1(items, i)
-#define GET_ARRAY2D(arr, i, k) *(double*)PyArray_GETPTR2(items, i, k)
+#define GET_ARRAY1D(arr, i) *(double*)PyArray_GETPTR1(arr, i)
+#define GET_ARRAY2D(arr, i, k) *(double*)PyArray_GETPTR2(arr, i, k)
 
 /**
 * Pairwise distance indexing functions
