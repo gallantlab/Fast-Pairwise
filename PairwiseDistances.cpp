@@ -38,6 +38,7 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
 {
 	// two-pass algo as used in scipy.spatial.distance
 	// the commented out stuff are factored out to reduce complexity
+	// see line 116 in PairwiseDistances.cpp
 	// but kept here to show the algorithm
 
 	/*
@@ -205,9 +206,10 @@ unsigned long Indexer::RowIndex(unsigned long long condensed) const
 	long center;
 	long left = 0;
 	long right = nItems - 2;
+	// binary search for row
 	while (left < right)
 	{
-		center = (left + right) / 2;
+		center = (left + right) / 2;	// TODO: can change this int division to float division for more speed
 		if (itemsToRow[center + 1] <= condensed)
 			left = center + 1;
 		else
