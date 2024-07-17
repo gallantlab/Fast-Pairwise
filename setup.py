@@ -1,6 +1,8 @@
+import numpy
 from setuptools import setup, Extension
 
 PairwiseModule = Extension('Pairwise', sources = ['PairwiseDistances.cpp'],
+						   include_dirs = [numpy.get_include()],
 						   extra_compile_args = ["-fopenmp", "-lm", "-O2"],
 						   extra_link_args = ["-fopenmp", "-lm"])
 
