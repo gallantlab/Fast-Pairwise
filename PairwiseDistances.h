@@ -32,8 +32,6 @@ static PyObject* GetPairwiseEuclideanDistance(PyObject *self, PyObject *args);
 
 static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args);
 
-static PyObject* GetPairwiseFastCorrelationDistance(PyObject *self, PyObject *args);
-
 /**
  * Python module boilerplate
  */
@@ -89,8 +87,6 @@ static double Euclidean(PyArrayObject* items, int i, int j, int length);
 static double RandomForest(PyArrayObject* items, int i, int j, int length);
 
 static double Correlation(PyArrayObject* items, int i, int j, int length);
-
-static double FastCorrelation(PyArrayObject* items, int i, int j, int length);
 
 
 /**

@@ -63,29 +63,6 @@ static double Correlation(PyArrayObject* items, int i, int j, int length)
 	return 1.0 - sumXY / sqrt(sumX2 * sumY2);
 }
 
-static double FastCorrelation(PyArrayObject* items, int i, int j, int length)
-{
-	// see https://en.wikipedia.org/wiki/Pearson_correlation_coefficient#Mathematical_properties
-	// for this potentially numerically unstable single pass algorithm
-	double sumXY = 0.0,
-		sumX = 0.0,
-		sumY = 0.0,
-		sumX2 = 0.0,
-		sumY2 = 0.0;
-	for (int k = 0; k < length; k++)
-	{
-		double x = GET_ARRAY2D(items, i, k);
-		double y = GET_ARRAY2D(items, j, k);
-		sumXY += x * y;
-		sumX += x;
-		sumY += y;
-		sumX2 += x * x;
-		sumY2 += y * y;
-	}
-	double numerator = (double)length * sumXY - sumX * sumY;
-	double denominator = sqrt((double)length * sumX2 - sumX * sumX) * sqrt((double)length * sumY2 - sumY * sumY);
-	return 1 - numerator / denominator;
-}
 
 static PyObject* GetPairwiseRandomForestDistance(PyObject *self, PyObject *args)
 {
@@ -101,11 +78,6 @@ static PyObject* GetPairwiseEuclideanDistance(PyObject *self, PyObject *args)
 static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args)
 {
 	return GetPairwiseDistance(args, &Correlation, NPY_DOUBLE);
-}
-
-static PyObject* GetPairwiseFastCorrelationDistance(PyObject *self, PyObject *args)
-{
-	return GetPairwiseDistance(args, &FastCorrelation, NPY_DOUBLE);
 }
 
 static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(PyArrayObject*, int i, int j, int length),
@@ -129,10 +101,8 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	unsigned long long numItems = dims[0];
 	unsigned int numFeatures = dims[1];
 
-	cout << numItems << endl << numFeatures << endl;
 #ifdef REVERSE_INDEX
 	unsigned long long numCondensed = numItems * (numItems - 1) / 2;
-	cout << numCondensed << endl;
 #endif
 
 #ifndef REVERSE_INDEX
