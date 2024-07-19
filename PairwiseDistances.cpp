@@ -184,3 +184,56 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 
 
 #endif
+
+static PyObject* GetClusteringDistance(PyObject *self, PyObject *args)
+{
+	// == Read in the arguments as a generic python objects first
+	PyObject *s1;	// this should be the array that is passed to us
+	PyObject *s2;	// output array because the number of values in the condensed distance array
+	bool normalize = true;
+	// is a large factorial that can exceed npy_intp, and thus it's easier to
+	// allocate the output in python first
+
+	if (!PyArg_ParseTuple(args, "OO|p", &s1, &s2, &normalize))	// "O" means object, 'p' means bool
+		return nullptr;
+
+	// == Cast the generic python objects to Numpy array objects
+	PyArrayObject *solution1 = (PyArrayObject*)PyArray_FROM_OTF(s1, NPY_INT64, NPY_ARRAY_IN_ARRAY);
+	PyArrayObject *solution2 = (PyArrayObject*)PyArray_FROM_OTF(s2, NPY_INT64, NPY_ARRAY_IN_ARRAY);
+
+	// get dimensions
+	npy_intp *dims = PyArray_DIMS(solution1);
+	unsigned long long numItems = dims[0];
+
+
+	unsigned long long numPairs = numItems * (numItems - 1) / 2;
+
+	Indexer* indexer = new Indexer(numItems);
+
+	double dist = 0.0;
+
+	// calculate pairwise relationships between items in each solution
+	// and calc distance
+#pragma omp parallel for
+	for (unsigned long long i = 0; i < numPairs; i++)
+	{
+		unsigned long row = indexer->RowIndex(i);
+		unsigned long col = indexer->ColIndex(i, row);
+
+		bool sol1Pair = GET_1D_INT(solution1, row) == GET_1D_INT(solution1, col);
+		bool sol2Pair = GET_1D_INT(solution2, row) == GET_1D_INT(solution2, col);
+
+		if (sol1Pair != sol2Pair)
+		{
+			#pragma omp atomic
+			dist += 1;
+		}
+	}
+
+	delete indexer;
+
+	if (normalize)
+		dist /= (double)numPairs;
+
+	return PyFloat_FromDouble(dist);
+}

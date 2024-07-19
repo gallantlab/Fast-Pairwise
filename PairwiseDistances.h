@@ -32,6 +32,9 @@ static PyObject* GetPairwiseEuclideanDistance(PyObject *self, PyObject *args);
 
 static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args);
 
+static PyObject* GetClusteringDistance(PyObject *self, PyObject *args);
+
+
 /**
  * Python module boilerplate
  */
@@ -58,6 +61,15 @@ static PyMethodDef PythonDistanceMethods[] =
 			"items fell into the same leaf node\n"
 			"@param items:	a 2d [nItems, nFeatures] numpy array\n"
 			"@param out:	an empty 1d array of size (nItems * (nItems - 1) / 2) for the output condensed distance matrix\n"},
+
+		{"GetClusteringDistance", &GetClusteringDistance, METH_VARARGS,
+			"GetClusteringDistance(solution1, solution2, normalize: bool = True)\n"
+			"Gets the clustering distance between solutions as defined in \n"
+			"Wang Biometrika 2010 and Fang & Wang Comp Stat & Data Analysis. 2012\n"
+			"@param solution1:	one clustering solution of the set of items in which each entry is an int for the cluster ID\n"
+			"@param solution2:	another colustering solution\n"
+			"@param normalize:	normalize the return value by the number of pairs?"
+			"@return:	clustering distance\n"},
 		{NULL, NULL, 0,     NULL}
 	};
 
