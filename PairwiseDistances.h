@@ -34,6 +34,8 @@ static PyObject* GetPairwiseCorrelationDistance(PyObject *self, PyObject *args);
 
 static PyObject* GetClusteringDistance(PyObject *self, PyObject *args);
 
+static PyObject* GetClusteringDistances(PyObject *self, PyObject *args);
+
 
 /**
  * Python module boilerplate
@@ -70,6 +72,13 @@ static PyMethodDef PythonDistanceMethods[] =
 			"@param solution2:	another colustering solution\n"
 			"@param normalize:	normalize the return value by the number of pairs?"
 			"@return:	clustering distance\n"},
+		{"GetClusteringDistances", &GetClusteringDistances, METH_VARARGS,
+			"GetClusteringDistance(solutions, out, normalize: bool = True)\n"
+			"Gets the clustering distance between all pairs of solutions. Uses the same method as GetClusteringDistance\n"
+			"but this is for many solutions instead of a just a single pair\n"
+			"@param solutions:	[nSolutions, nitems] many different clustering solutions on the same number of items\n"
+			"@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"
+			"@param normalize:	normalize the clustering distances by the number of pairs of items?"},
 		{NULL, NULL, 0,     NULL}
 	};
 
@@ -118,8 +127,9 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
 * Shorthand macros for getting doubles from arrays
 */
 
-#define GET_ARRAY1D(arr, i) *(double*)PyArray_GETPTR1(arr, i)
-#define GET_ARRAY2D(arr, i, k) *(double*)PyArray_GETPTR2(arr, i, k)
+#define GET_1D_DOUBLE(arr, i) *(double*)PyArray_GETPTR1(arr, i)
+#define GET_2D_DOUBLE(arr, i, k) *(double*)PyArray_GETPTR2(arr, i, k)
+#define GET_2D_INT(arr, i, k) *(int*)PyArray_GETPTR2(arr, i, k)
 #define GET_1D_INT(arr, i) *(int*)PyArray_GETPTR1(arr, i)
 
 /**

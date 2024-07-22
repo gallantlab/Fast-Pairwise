@@ -2,7 +2,9 @@
 #include "PairwiseIndexer.h"
 
 #include <iostream>
+#include <boost/dynamic_bitset.hpp>
 using namespace std;
+using namespace boost;
 
 
 PyMODINIT_FUNC PyInit_Pairwise(void)
@@ -46,8 +48,8 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
 	double Xmean = 0.0, Ymean = 0.0;
 	for (int k = 0; k < length; k++)
 	{
-		Xmean += GET_ARRAY2D(items, i, k);
-		Ymean += GET_ARRAY2D(items, j, k);
+		Xmean += GET_2D_DOUBLE(items, i, k);
+		Ymean += GET_2D_DOUBLE(items, j, k);
 	}
 	Xmean /= (double)length; Ymean /= (double)length;
 	 */
@@ -58,8 +60,8 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
 
 	for (int k = 0; k < length; k++)
 	{
-		double x = GET_ARRAY2D(items, i, k) /*- Xmean*/;
-		double y = GET_ARRAY2D(items, j, k) /*- Ymean*/;
+		double x = GET_2D_DOUBLE(items, i, k) /*- Xmean*/;
+		double y = GET_2D_DOUBLE(items, j, k) /*- Ymean*/;
 
 	/*	meanX2 += x * x;
 		meanY2 += y * y;
@@ -125,12 +127,12 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 			double mean = 0.0;
 			meanSquares[i] = 0.0;
 			for (unsigned int j = 0; j < numFeatures; j++)
-				mean += GET_ARRAY2D(itemArray, i, j);
+				mean += GET_2D_DOUBLE(itemArray, i, j);
 			mean /= (double)numFeatures;
 
 			for (unsigned int j = 0; j < numFeatures; j++)
 			{
-				double val = GET_ARRAY2D(itemArray, i, j) - mean;
+				double val = GET_2D_DOUBLE(itemArray, i, j) - mean;
 				rawDemeaned[i * numFeatures + j] = val;
 				meanSquares[i] += val * val;
 			}
@@ -236,4 +238,67 @@ static PyObject* GetClusteringDistance(PyObject *self, PyObject *args)
 		dist /= (double)numPairs;
 
 	return PyFloat_FromDouble(dist);
+}
+
+static PyObject* GetClusteringDistances(PyObject *self, PyObject *args)
+{
+	// == Read in the arguments as a generic python objects first
+	PyObject *arg1;	// this should be the array that is passed to us
+	PyObject *arg2;	// output array because the number of values in the condensed distance array
+	bool normalize = true;
+	// is a large factorial that can exceed npy_intp, and thus it's easier to
+	// allocate the output in python first
+
+	if (!PyArg_ParseTuple(args, "OO|p", &arg1, &arg2, &normalize))	// "O" means object, 'p' means bool
+		return nullptr;
+
+	// == Cast the generic python objects to Numpy array objects
+	PyArrayObject *clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_INT64, NPY_ARRAY_IN_ARRAY);
+	PyArrayObject *clusterDistances = (PyArrayObject*)PyArray_FROM_OTF(arg2, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
+
+	// get dimensions
+	npy_intp *dims = PyArray_DIMS(clusterSolutions);
+	unsigned long long numSolutions = dims[0];
+	unsigned long long numItems = dims[1];
+	unsigned long long numSolutionPairs = numSolutions * (numSolutions - 1) / 2;
+	unsigned long long numItemPairs = numItems * (numItems - 1) / 2;
+
+	// pairwise indexers
+	Indexer* itemIndexer = new Indexer(numItems);
+	Indexer* solutionIndexer = new Indexer(numSolutions);
+
+	// pre-compute within-solution pairwise indicator variables
+	dynamic_bitset<> *solutionPairs = new dynamic_bitset<>[numSolutionPairs];
+	for (unsigned long long solution = 0; solution < numSolutions; solution++)
+	{
+		solutionPairs[solution] = dynamic_bitset<>(numItemPairs);
+
+		#pragma omp parallel for
+		for (unsigned long long j = 0; j < numItemPairs; j++)
+		{
+			unsigned long item1 = itemIndexer->RowIndex(j);
+			unsigned long item2 = itemIndexer->ColIndex(j, item1);
+			solutionPairs[solution].set(j, GET_2D_INT(clusterSolutions, solution, item1) == GET_2D_INT(clusterSolutions, solution, item2));
+		}
+	}
+
+	// for pairs of solutions, compute their distances
+	#pragma omp parallel for
+	for (unsigned long long solutionPair = 0; solutionPair < numSolutionPairs; solutionPair++)
+	{
+		unsigned long solution1 = solutionIndexer->RowIndex(solutionPair);
+		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
+
+		// this is a hamming distance, no?
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)(solutionPairs[solution1] ^ solutionPairs[solution2]).count();
+	}
+
+	if (normalize)
+		#pragma omp parallel for
+		for (unsigned long long i = 0; i < numSolutionPairs; i++)
+			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
+
+	delete [] solutionPairs;
+
+	Py_RETURN_NONE;
 }
