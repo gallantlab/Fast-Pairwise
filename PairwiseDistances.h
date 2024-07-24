@@ -142,34 +142,3 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
 #define GET_2D_DOUBLE(arr, i, k) *(double*)PyArray_GETPTR2(arr, i, k)
 #define GET_2D_INT(arr, i, k) *(int*)PyArray_GETPTR2(arr, i, k)
 #define GET_1D_INT(arr, i) *(int*)PyArray_GETPTR1(arr, i)
-
-/**
-* Pairwise distance indexing functions
- * see https://stackoverflow.com/a/36867493
-*/
-#define  REVERSE_INDEX
-
-#ifdef REVERSE_INDEX
-
-static int RowIndex(unsigned long long condensed, unsigned long long nItems)
-{
-	return int(ceil(0.5 * (- sqrt(-8 * condensed + 4 * nItems * nItems - 4 * nItems - 7) + 2 * nItems - 1) - 1));
-}
-
-/**
- * Number of items up to and including the nth row
- * @param rowIndex
- * @param nItems
- * @return
- */
-static int NumItemsToRow(unsigned long long rowIndex, unsigned long long nItems)
-{
-	return rowIndex * (nItems - 1 - rowIndex) + (rowIndex * (rowIndex + 1)) / 2;
-}
-
-static int ColIndex(unsigned long long condensed, unsigned int rowIndex, unsigned long long nItems)
-{
-	return int(nItems - NumItemsToRow(rowIndex + 1, nItems) + condensed);
-}
-
-#endif

@@ -201,19 +201,6 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		itemArray = (PyArrayObject*)PyArray_SimpleNewFromData(2, dims, NPY_DOUBLE, rawDemeaned);
 	}
 
-#ifndef REVERSE_INDEX
-	#pragma omp parallel for
-	for (unsigned long long k = 0; k < numItems * numItems; k++)
-	{
-		unsigned long long i = k / numItems, j = k % numItems;
-		if (i < j)
-		{
-			unsigned long long index = numItems * i - (i * (i + 1)) / 2 + j - 1 - i;
-			double d = DistanceFunction(itemArray, i, j, numFeatures, meanSquares);
-			*((double*)PyArray_GETPTR1(outArray, index)) = d;
-		}
-	}
-#else
 	unsigned long long numCondensed = numItems * (numItems - 1) / 2;
 	Indexer *indexer = new Indexer(numItems);
 
@@ -226,7 +213,6 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	}
 
 	delete indexer;
-#endif
 
 	// clean up stuff used for correlation
 	if (DistanceFunction == &Correlation)
@@ -239,11 +225,6 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 
 	Py_RETURN_NONE;
 }
-
-#ifdef  REVERSE_INDEX
-
-
-#endif
 
 static PyObject* GetClusteringDistance(PyObject *self, PyObject *args)
 {
@@ -374,6 +355,7 @@ static PyObject* GetClusteringDistances(PyObject *self, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+
 static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *args)
 {
 	// == Read in the arguments as a generic python objects first
@@ -390,10 +372,17 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 	PyArrayObject *clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
 	PyArrayObject *clusterDistances = (PyArrayObject*)PyArray_FROM_OTF(arg2, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
 
+	unsigned long SIMD_STRIDE = 64;
+
 	if (clusterSolutions == nullptr)
 	{
-		PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8");
-		Py_RETURN_NONE;
+		clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT16, NPY_ARRAY_IN_ARRAY);
+		if (clusterSolutions == nullptr)
+		{
+			PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
+			Py_RETURN_NONE;
+		}
+		SIMD_STRIDE = 32;
 	}
 
 	// get dimensions
@@ -538,7 +527,6 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 	}
 	end = time(nullptr);
 	double diff = difftime(end, start);
-	cout << "With-solution vertex distances " << diff << " seconds; average " << diff / (double)numSolutions << " each" << endl;
 
 	// for pairs of solutions, compute their distances
 	start = time(nullptr);
@@ -563,7 +551,6 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 
 	end = time(nullptr);
 	diff = difftime(end, start);
-	cout << "Solution distances " << diff << " seconds; average " << diff / (double)numSolutionPairs << " each" << endl;
 
 	if (normalize)
 	#pragma omp parallel for
