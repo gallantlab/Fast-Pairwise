@@ -370,7 +370,7 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 
 	// == Cast the generic python objects to Numpy array objects
 	PyArrayObject* clusterSolutions;
-	int arrayType = PyArray_TYPE((PyArrayObject*)PyArray_FROM_O(arg1));
+	int arrayType = PyArray_TYPE((PyArrayObject*)PyArray_FROM_O(arg1);
 	switch (arrayType)
 	{
 		case NPY_UINT8:
