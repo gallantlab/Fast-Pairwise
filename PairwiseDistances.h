@@ -6,6 +6,7 @@
 #include <math.h>
 #include "numpy/arrayobject.h"
 #include "numpy/npy_math.h"
+#include "PairwiseIndexer.h"
 
 PyMODINIT_FUNC PyInit_Pairwise(void);
 
@@ -132,6 +133,30 @@ static double Euclidean(PyArrayObject* items, int i, int j, int length, const do
 static double RandomForest(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
 
 static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
+
+enum SIMD
+{
+	UINT8,
+	UINT16,
+	NONE
+};
+
+/**
+ * Functions for AVX stuff that deals with different data types that necessitate the use of different vector sizes
+ * but has the same signature
+ * @param solutions			cluster assignments in ints in [solution, item]
+ * @param distances 		array to write the distances back out to
+ * @param numSolutions 		number of solutions (solutions dim 1)
+ * @param numItems 			numer of items (solutions dim 2)
+ * @param numSolutionPairs 	number of solution pairs
+ * @param numItemPairs 		number of item pairs
+ * @param itemIndexer 		an indexer for backwards indexing into item pairs
+ * @param solutionIndexer 	an indexer for backwards idnexing into solution pairs
+ */
+static void ClusteringDistanceUINT8(PyArrayObject* solutions, PyArrayObject* distances, unsigned long long numSolutions, unsigned long long numItems,
+									unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer);
+static void ClusteringDistanceUINT16(PyArrayObject* solutions, PyArrayObject* distances, unsigned long long numSolutions, unsigned long long numItems,
+									 unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer);
 
 
 /**

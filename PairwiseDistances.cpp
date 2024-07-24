@@ -359,34 +359,34 @@ static PyObject* GetClusteringDistances(PyObject *self, PyObject *args)
 static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *args)
 {
 	// == Read in the arguments as a generic python objects first
-	PyObject *arg1;	// this should be the array that is passed to us
-	PyObject *arg2;	// output array because the number of values in the condensed distance array
+	PyObject* arg1;    // this should be the array that is passed to us
+	PyObject* arg2;    // output array because the number of values in the condensed distance array
 	bool normalize = true;
 	// is a large factorial that can exceed npy_intp, and thus it's easier to
 	// allocate the output in python first
 
-	if (!PyArg_ParseTuple(args, "OO|p", &arg1, &arg2, &normalize))	// "O" means object, 'p' means bool
+	if (!PyArg_ParseTuple(args, "OO|p", &arg1, &arg2, &normalize))    // "O" means object, 'p' means bool
 		return nullptr;
 
 	// == Cast the generic python objects to Numpy array objects
-	PyArrayObject *clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
-	PyArrayObject *clusterDistances = (PyArrayObject*)PyArray_FROM_OTF(arg2, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
+	PyArrayObject* clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
+	PyArrayObject* clusterDistances = (PyArrayObject*)PyArray_FROM_OTF(arg2, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
 
-	unsigned long SIMD_STRIDE = 64;
+	SIMD type = SIMD::UINT8;
 
 	if (clusterSolutions == nullptr)
 	{
 		clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT16, NPY_ARRAY_IN_ARRAY);
+		type = SIMD::UINT16;
 		if (clusterSolutions == nullptr)
 		{
 			PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
 			Py_RETURN_NONE;
 		}
-		SIMD_STRIDE = 32;
 	}
 
 	// get dimensions
-	npy_intp *dims = PyArray_DIMS(clusterSolutions);
+	npy_intp* dims = PyArray_DIMS(clusterSolutions);
 	unsigned long long numSolutions = dims[0];
 	unsigned long long numItems = dims[1];
 	unsigned long long numSolutionPairs = numSolutions * (numSolutions - 1) / 2;
@@ -396,23 +396,33 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 	Indexer* itemIndexer = new Indexer(numItems);
 	Indexer* solutionIndexer = new Indexer(numSolutions);
 
+	switch (type)
+	{
+		case UINT8:
+			ClusteringDistanceUINT8(clusterSolutions, clusterDistances, numSolutions, numItems, numSolutionPairs, numItemPairs, itemIndexer, solutionIndexer);
+		case UINT16:
+			ClusteringDistanceUINT16(clusterSolutions, clusterDistances, numSolutions, numItems, numSolutionPairs, numItemPairs, itemIndexer, solutionIndexer);
+		case NONE:
+			break;
+	}
 
-	cout << "item distances" << endl;
-	// pre-compute within-solution pairwise indicator variables
-//	BitArray *pairwiseClusterEqualities = new BitArray[numSolutions];
+	if (normalize)
+		#pragma omp parallel for
+		for (unsigned long long i = 0; i < numSolutionPairs; i++)
+			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
 
-	time_t start, end;
+	Py_RETURN_NONE;
+}
 
-	start = time(nullptr);
 
+static void ClusteringDistanceUINT8(PyArrayObject* clusterSolutions, PyArrayObject* clusterDistances, unsigned long long numSolutions, unsigned long long numItems,
+									unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer)
+{
 	// we use a raw bit array to store things because it's faster and we can use AVX intrinsics on them
 	u_int64_t ** bitArrays = new u_int64_t*[numSolutions];
 	unsigned long long nFullInts = numItemPairs / 64;
 	unsigned long long nOverflowBits = numItemPairs % 64;
 	unsigned long long nTotalInts = nFullInts + (nOverflowBits > 0 ? 1 : 0);
-	u_int64_t overflowMask = 0;
-	for (int i = 0; i < nOverflowBits; i++)
-		overflowMask |= (1 << i);
 
 #pragma omp parallel for
 	for (unsigned long long solution = 0; solution < numSolutions; solution++)
@@ -525,11 +535,8 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 #endif
 
 	}
-	end = time(nullptr);
-	double diff = difftime(end, start);
 
 	// for pairs of solutions, compute their distances
-	start = time(nullptr);
 	#pragma omp parallel for
 	for (unsigned long long solutionPair = 0; solutionPair < numSolutionPairs; solutionPair++)
 	{
@@ -548,14 +555,87 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 	for (int i = 0; i < numSolutions; i++)
 		delete [] bitArrays[i];
 	delete [] bitArrays;
-
-	end = time(nullptr);
-	diff = difftime(end, start);
-
-	if (normalize)
-	#pragma omp parallel for
-		for (unsigned long long i = 0; i < numSolutionPairs; i++)
-			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
-
-	Py_RETURN_NONE;
 }
+
+static void ClusteringDistanceUINT16(PyArrayObject* clusterSolutions, PyArrayObject* clusterDistances, unsigned long long numSolutions, unsigned long long numItems,
+									unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer)
+{
+	// we use a raw bit array to store things because it's faster and we can use AVX intrinsics on them
+	u_int32_t ** bitArrays = new u_int32_t*[numSolutions];
+	unsigned long long nFullInts = numItemPairs / 32;
+	unsigned long long nOverflowBits = numItemPairs % 32;
+	unsigned long long nTotalInts = nFullInts + (nOverflowBits > 0 ? 1 : 0);
+
+#pragma omp parallel for
+	for (unsigned long long solution = 0; solution < numSolutions; solution++)
+	{
+		bitArrays[solution] = new u_int32_t[nTotalInts];
+
+		unsigned long count = 0;
+
+		__m512i top, bottom;
+		__mmask32 result;
+		uint16_t topNums[32];
+		uint16_t bottomNums[32];
+
+		for (unsigned long long j = 0; j < numItemPairs; j += 32)
+		{
+			unsigned long item1 = itemIndexer->RowIndex(j);
+			unsigned long item2 = itemIndexer->ColIndex(j, item1);
+			if (item1 == itemIndexer->RowIndex(j + 32))
+			{
+				// top value is the same and bottom value doesn't wrap
+				#pragma omp simd
+				for(int k = 0; k < 32; k++)
+					topNums[k] = *(u_int16_t *)PyArray_GETPTR2(clusterSolutions, solution, item1);
+				top = _mm512_loadu_si512(topNums);
+//				top = _mm512_set1_epi8(*(char*)PyArray_GETPTR2(clusterSolutions, solution, item1));
+				bottom = _mm512_loadu_si512(PyArray_GETPTR2(clusterSolutions, solution, item2));
+			}
+			else
+			{
+				for (int c = 0; c < 32; c++)
+				{
+					if ((c + j) < numItemPairs)
+					{
+						item1 = itemIndexer->RowIndex(j + c);
+						item2 = itemIndexer->ColIndex(j + c, item1);
+						topNums[c] = *(uint16_t*)PyArray_GETPTR2(clusterSolutions, solution, item1);
+						bottomNums[c] = *(uint16_t*)PyArray_GETPTR2(clusterSolutions, solution, item2);
+					}
+					else
+					{
+						topNums[c] = 0;
+						bottomNums[c] = 0;
+					}
+				}
+
+				top = _mm512_loadu_si512(topNums);
+				bottom = _mm512_loadu_si512(bottomNums);
+			}
+			result = _mm512_cmpeq_epu16_mask(top, bottom);
+			_store_mask32(((__mmask32*)(&bitArrays[solution][count++])), result);
+		}
+	}
+
+	// for pairs of solutions, compute their distances
+	#pragma omp parallel for
+	for (unsigned long long solutionPair = 0; solutionPair < numSolutionPairs; solutionPair++)
+	{
+		unsigned long solution1 = solutionIndexer->RowIndex(solutionPair);
+		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
+
+		unsigned long long count = 0;
+		#pragma omp simd reduction(+:count)
+		for(unsigned long i = 0; i < nTotalInts; i++)
+		{ // we don't have to think about the last half-full int because the extra bits are all 0 and guaranteed to XOR to false and don't count
+			count += _mm_popcnt_u32(bitArrays[solution1][i] ^ bitArrays[solution2][i]);
+		}
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count;
+	}
+
+	for (int i = 0; i < numSolutions; i++)
+		delete [] bitArrays[i];
+	delete [] bitArrays;
+}
+
