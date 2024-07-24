@@ -134,13 +134,6 @@ static double RandomForest(PyArrayObject* items, int i, int j, int length, const
 
 static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
 
-enum SIMD
-{
-	UINT8,
-	UINT16,
-	NONE
-};
-
 /**
  * Functions for AVX stuff that deals with different data types that necessitate the use of different vector sizes
  * but has the same signature

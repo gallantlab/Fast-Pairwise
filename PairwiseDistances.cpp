@@ -369,20 +369,27 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 		return nullptr;
 
 	// == Cast the generic python objects to Numpy array objects
-	PyArrayObject* clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
+	PyArrayObject* clusterSolutions;
+	int arrayType = PyArray_TYPE((PyArrayObject*)PyArray_FROM_O(arg1));
+	switch (arrayType)
+	{
+		case NPY_UINT8:
+			clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT8, NPY_ARRAY_IN_ARRAY);
+			break;
+		case NPY_UINT16:
+			clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT16, NPY_ARRAY_IN_ARRAY);
+			break;
+		default:
+			clusterSolutions = nullptr;
+	}
+
 	PyArrayObject* clusterDistances = (PyArrayObject*)PyArray_FROM_OTF(arg2, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
 
-	SIMD type = SIMD::UINT8;
 
 	if (clusterSolutions == nullptr)
 	{
-		clusterSolutions = (PyArrayObject*)PyArray_FROM_OTF(arg1, NPY_UINT16, NPY_ARRAY_IN_ARRAY);
-		type = SIMD::UINT16;
-		if (clusterSolutions == nullptr)
-		{
-			PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
-			Py_RETURN_NONE;
-		}
+		PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
+		Py_RETURN_NONE;
 	}
 
 	// get dimensions
@@ -396,14 +403,12 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 	Indexer* itemIndexer = new Indexer(numItems);
 	Indexer* solutionIndexer = new Indexer(numSolutions);
 
-	switch (type)
+	switch (arrayType)
 	{
-		case UINT8:
+		case NPY_UINT8:
 			ClusteringDistanceUINT8(clusterSolutions, clusterDistances, numSolutions, numItems, numSolutionPairs, numItemPairs, itemIndexer, solutionIndexer);
-		case UINT16:
+		case NPY_UINT16:
 			ClusteringDistanceUINT16(clusterSolutions, clusterDistances, numSolutions, numItems, numSolutionPairs, numItemPairs, itemIndexer, solutionIndexer);
-		case NONE:
-			break;
 	}
 
 	if (normalize)
