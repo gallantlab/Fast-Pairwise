@@ -27,6 +27,9 @@ Indexer::~Indexer()
 
 unsigned long Indexer::RowIndex(unsigned long long condensed) const
 {
+	if (condensed > (nItems * (nItems - 1) / 2))
+		return nItems;	// failure mode for when indexing beyond max
+
 	long center;
 	long left = 0;
 	long right = nItems - 2;

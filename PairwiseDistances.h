@@ -36,6 +36,8 @@ static PyObject* GetClusteringDistance(PyObject *self, PyObject *args);
 
 static PyObject* GetClusteringDistances(PyObject *self, PyObject *args);
 
+static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *args);
+
 
 /**
  * Python module boilerplate
@@ -72,6 +74,7 @@ static PyMethodDef PythonDistanceMethods[] =
 			"@param solution2:	another colustering solution\n"
 			"@param normalize:	normalize the return value by the number of pairs?"
 			"@return:	clustering distance\n"},
+
 		{"GetClusteringDistances", &GetClusteringDistances, METH_VARARGS,
 			"GetClusteringDistance(solutions, out, normalize: bool = True)\n"
 			"Gets the clustering distance between all pairs of solutions. Uses the same method as GetClusteringDistance\n"
@@ -79,6 +82,14 @@ static PyMethodDef PythonDistanceMethods[] =
 			"@param solutions:	[nSolutions, nitems] many different clustering solutions on the same number of items\n"
 			"@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"
 			"@param normalize:	normalize the clustering distances by the number of pairs of items?"},
+
+		{"GetClusteringDistancesExplicitAVX", &GetClusteringDistancesExplicitAVX, METH_VARARGS,
+		 "GetClusteringDistanceExplicitAVX(solutions, out, normalize: bool = True)\n"
+		 "Like GetClusteringDistances but explicitly uses AVX512 intrinsics\n"
+		 "but this is for many solutions instead of a just a single pair\n"
+		 "@param solutions:	[nSolutions, nitems] many different clustering solutions on the same number of items\n"
+		 "@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"
+		 "@param normalize:	normalize the clustering distances by the number of pairs of items?"},
 		{NULL, NULL, 0,     NULL}
 	};
 
