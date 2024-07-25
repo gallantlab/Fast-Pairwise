@@ -437,64 +437,6 @@ static void ClusteringDistanceUINT8(PyArrayObject* clusterSolutions, PyArrayObje
 		uint8_t topNums[64];
 		uint8_t bottomNums[64];
 
-#ifdef FORWARD
-		unsigned long i = 0;
-		int jOffset = 0;
-		int jRemaining;
-
-		// minus 65 because that point is the last one that can have a full register on one row
-		// and there's few items remaining to do it one-by-one without simds
-		for (; i < numItems - 65; i ++)
-		{
-			// there's a broadcast intrinsic that takes a char, but uint is an unsigned char
-			for (int c = 0; c < 64; c++)
-				topNums[c] = *(uint8_t*)PyArray_GETPTR2(clusterSolutions, solution, i);
-			top = _mm512_loadu_si512(topNums);
-
-			// the offset wraps around 64 but is at least 1 ahead of i
-			jOffset %= 64;
-			unsigned long j = i + jOffset + 1;		// counter for the 2nd item in the comparison
-			jRemaining = ((numItems - j) % 64);	// the stuff at the end that's too short to fit in the register
-
-			// compute everything we can on this row with a full register
-			for (; j < numItems - jRemaining; j += 64)
-			{
-				bottom = _mm512_load_si512(PyArray_GETPTR2(clusterSolutions, solution, i));
-				result = _mm512_cmpeq_epu8_mask(top, bottom);
-				_store_mask64((pairwiseClusterEqualities[solution].GetByteAsMask(count++)), result);
-			}
-
-			// because we are storing the results into bits as a uint64, we _have_ to roll around the edge
-			if (jRemaining > 0)
-			{
-				for (int c = 0; c < 64; c++)
-				{
-					if (c < jRemaining)	// remainder of the comparisons - load the bottom numbers since the top is still i
-					{
-						bottomNums[c] = *(uint8_t*)PyArray_GETPTR2(clusterSolutions, solution, j++);
-					}
-					else				// rollover comparisons - top number needs loading also
-					{
-						topNums[c] = *(uint8_t*)PyArray_GETPTR2(clusterSolutions, solution, i + 1);
-						bottomNums[c] = *(uint8_t*)PyArray_GETPTR2(clusterSolutions, solution, (i + 1) + (jOffset++));
-					}
-				}
-				result = _mm512_cmpeq_epu8_mask(top, bottom);
-				_store_mask64((pairwiseClusterEqualities[solution].GetByteAsMask(count++)), result);
-			}
-		}
-
-		unsigned long long c2 = 0;
-		for(; i < numItems - 1; i++)
-		{
-			unsigned long j = i + jOffset + 1;
-			jOffset = 0;
-			for (; j < numItems; j ++)
-			{
-				pairwiseClusterEqualities[solution].SetBit(count * 64 + c2++, GET_2D_INT(clusterSolutions, solution, i) == GET_2D_INT(clusterSolutions, solution, j));
-			}
-		}
-#else
 		for (unsigned long long j = 0; j < numItemPairs; j += 64)
 		{
 			unsigned long item1 = itemIndexer->RowIndex(j);
@@ -533,7 +475,6 @@ static void ClusteringDistanceUINT8(PyArrayObject* clusterSolutions, PyArrayObje
 			result = _mm512_cmpeq_epu8_mask(top, bottom);
 			_store_mask64(((__mmask64*)(&bitArrays[solution][count++])), result);
 		}
-#endif
 
 	}
 
