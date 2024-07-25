@@ -339,16 +339,12 @@ static PyObject* GetClusteringDistances(PyObject *self, PyObject *args)
 		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
 
 		// this is a hamming distance, no?
-		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)(solutionPairs[solution1] ^ solutionPairs[solution2]).count();
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)(solutionPairs[solution1] ^ solutionPairs[solution2]).count() / (double)(solutionPairs[solution1] | solutionPairs[solution2]).count();
 	}
 	end = time(nullptr);
 	diff = difftime(end, start);
 	cout << "Solution distances " << diff << " seconds; average " << diff / (double)numSolutionPairs << " each" << endl;
 
-	if (normalize)
-		#pragma omp parallel for
-		for (unsigned long long i = 0; i < numSolutionPairs; i++)
-			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
 
 	delete [] solutionPairs;
 
@@ -411,10 +407,10 @@ static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *arg
 			ClusteringDistanceUINT16(clusterSolutions, clusterDistances, numSolutions, numItems, numSolutionPairs, numItemPairs, itemIndexer, solutionIndexer);
 	}
 
-	if (normalize)
-		#pragma omp parallel for
-		for (unsigned long long i = 0; i < numSolutionPairs; i++)
-			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
+//	if (normalize)
+//		#pragma omp parallel for
+//		for (unsigned long long i = 0; i < numSolutionPairs; i++)
+//			GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
 
 	Py_RETURN_NONE;
 }
@@ -549,12 +545,14 @@ static void ClusteringDistanceUINT8(PyArrayObject* clusterSolutions, PyArrayObje
 		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
 
 		unsigned long long count = 0;
-		#pragma omp simd reduction(+:count)
+		unsigned long long total = 0;
+		#pragma omp simd reduction(+:count, total)
 		for(unsigned long i = 0; i < nTotalInts; i++)
 		{ // we don't have to think about the last half-full int because the extra bits are all 0 and guaranteed to XOR to false and don't count
 			count += _mm_popcnt_u64(bitArrays[solution1][i] ^ bitArrays[solution2][i]);
+			total += _mm_popcnt_u64(bitArrays[solution1][i] | bitArrays[solution2][i]);
 		}
-		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count;
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)total;
 	}
 
 	for (int i = 0; i < numSolutions; i++)
@@ -631,12 +629,14 @@ static void ClusteringDistanceUINT16(PyArrayObject* clusterSolutions, PyArrayObj
 		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
 
 		unsigned long long count = 0;
-		#pragma omp simd reduction(+:count)
+		unsigned long long total = 0;
+		#pragma omp simd reduction(+:count, total)
 		for(unsigned long i = 0; i < nTotalInts; i++)
 		{ // we don't have to think about the last half-full int because the extra bits are all 0 and guaranteed to XOR to false and don't count
 			count += _mm_popcnt_u32(bitArrays[solution1][i] ^ bitArrays[solution2][i]);
+			total += _mm_popcnt_u32(bitArrays[solution1][i] | bitArrays[solution2][i]);
 		}
-		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count;
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)total;
 	}
 
 	for (int i = 0; i < numSolutions; i++)
