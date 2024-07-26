@@ -486,14 +486,12 @@ static void ClusteringDistanceUINT8(PyArrayObject* clusterSolutions, PyArrayObje
 		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
 
 		unsigned long long count = 0;
-		unsigned long long total = 0;
-		#pragma omp simd reduction(+:count, total)
+		#pragma omp simd reduction(+:count)
 		for(unsigned long i = 0; i < nTotalInts; i++)
 		{ // we don't have to think about the last half-full int because the extra bits are all 0 and guaranteed to XOR to false and don't count
 			count += _mm_popcnt_u64(bitArrays[solution1][i] ^ bitArrays[solution2][i]);
-			total += _mm_popcnt_u64(bitArrays[solution1][i] | bitArrays[solution2][i]);
 		}
-		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)total;
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)numSolutionPairs;
 	}
 
 	for (int i = 0; i < numSolutions; i++)
@@ -533,7 +531,7 @@ static void ClusteringDistanceUINT16(PyArrayObject* clusterSolutions, PyArrayObj
 				for(int k = 0; k < 32; k++)
 					topNums[k] = *(u_int16_t *)PyArray_GETPTR2(clusterSolutions, solution, item1);
 				top = _mm512_loadu_si512(topNums);
-//				top = _mm512_set1_epi8(*(char*)PyArray_GETPTR2(clusterSolutions, solution, item1));
+//				top = _mm512_set1_epi16(*(u_int16_t*)PyArray_GETPTR2(clusterSolutions, solution, item1));
 				bottom = _mm512_loadu_si512(PyArray_GETPTR2(clusterSolutions, solution, item2));
 			}
 			else
@@ -570,14 +568,12 @@ static void ClusteringDistanceUINT16(PyArrayObject* clusterSolutions, PyArrayObj
 		unsigned long solution2 = solutionIndexer->ColIndex(solutionPair, solution1);
 
 		unsigned long long count = 0;
-		unsigned long long total = 0;
-		#pragma omp simd reduction(+:count, total)
+		#pragma omp simd reduction(+:count)
 		for(unsigned long i = 0; i < nTotalInts; i++)
 		{ // we don't have to think about the last half-full int because the extra bits are all 0 and guaranteed to XOR to false and don't count
 			count += _mm_popcnt_u32(bitArrays[solution1][i] ^ bitArrays[solution2][i]);
-			total += _mm_popcnt_u32(bitArrays[solution1][i] | bitArrays[solution2][i]);
 		}
-		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)total;
+		GET_1D_DOUBLE(clusterDistances, solutionPair) = (double)count / (double)numSolutionPairs;
 	}
 
 	for (int i = 0; i < numSolutions; i++)
