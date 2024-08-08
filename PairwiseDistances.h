@@ -37,7 +37,9 @@ static PyObject* GetClusteringDistance(PyObject *self, PyObject *args);
 
 static PyObject* GetClusteringDistances(PyObject *self, PyObject *args);
 
-static PyObject* GetClusteringDistancesExplicitAVX(PyObject *self, PyObject *args);
+static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args);
+
+static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args);
 
 
 /**
@@ -84,13 +86,17 @@ static PyMethodDef PythonDistanceMethods[] =
 			"@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"
 			"@param normalize:	normalize the clustering distances by the number of pairs of items?"},
 
-		{"GetClusteringDistancesExplicitAVX", &GetClusteringDistancesExplicitAVX, METH_VARARGS,
-		 "GetClusteringDistanceExplicitAVX(solutions, out, normalize: bool = True)\n"
+		{"GetClusteringDistancesAVX", &GetClusteringDistancesAVX, METH_VARARGS,
+		 "GetClusteringDistanceAVX(solutions, out)\n"
 		 "Like GetClusteringDistances but explicitly uses AVX512 intrinsics\n"
-		 "but this is for many solutions instead of a just a single pair\n"
 		 "@param solutions:	[nSolutions, nitems] many different clustering solutions on the same number of items\n"
-		 "@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"
-		 "@param normalize:	normalize the clustering distances by the number of pairs of items?"},
+		 "@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"},
+
+		{"GetClusteringDistancesJaccardAVX", &GetClusteringDistancesJaccardAVX, METH_VARARGS,
+			"GetClusteringDistanceJaccardAVX(solutions, out)\n"
+			"Instead of pairwise hamming distance, use average item jaccard index for cluster distance\n"
+			"@param solutions:	[nSolutions, nitems] many different clustering solutions on the same number of items\n"
+			"@param out:		empty array of number of clustering pairs to output condensed distance matrix\n"},
 		{NULL, NULL, 0,     NULL}
 	};
 
@@ -146,10 +152,22 @@ static double Correlation(PyArrayObject* items, int i, int j, int length, const 
  * @param itemIndexer 		an indexer for backwards indexing into item pairs
  * @param solutionIndexer 	an indexer for backwards idnexing into solution pairs
  */
-static void ClusteringDistanceUINT8(PyArrayObject* solutions, PyArrayObject* distances, unsigned long long numSolutions, unsigned long long numItems,
-									unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer);
-static void ClusteringDistanceUINT16(PyArrayObject* solutions, PyArrayObject* distances, unsigned long long numSolutions, unsigned long long numItems,
-									 unsigned long long numSolutionPairs, unsigned long long numItemPairs, Indexer *itemIndexer, Indexer *solutionIndexer);
+static void ClusteringDistanceUINT8(PyArrayObject* solutions, PyArrayObject* distances,
+									unsigned long long numSolutions, unsigned long long numItems,
+									unsigned long long numSolutionPairs, unsigned long long numItemPairs,
+									Indexer *itemIndexer, Indexer *solutionIndexer);
+static void ClusteringDistanceUINT8Jaccard(PyArrayObject* solutions, PyArrayObject* distances,
+									unsigned long long numSolutions, unsigned long long numItems,
+									unsigned long long numSolutionPairs, unsigned long long numItemPairs,
+									Indexer *itemIndexer, Indexer *solutionIndexer);
+static void ClusteringDistanceUINT16(PyArrayObject* solutions, PyArrayObject* distances,
+									 unsigned long long numSolutions, unsigned long long numItems,
+									 unsigned long long numSolutionPairs, unsigned long long numItemPairs,
+									 Indexer *itemIndexer, Indexer *solutionIndexer);
+static void ClusteringDistanceUINT16Jaccard(PyArrayObject* solutions, PyArrayObject* distances,
+									 unsigned long long numSolutions, unsigned long long numItems,
+									 unsigned long long numSolutionPairs, unsigned long long numItemPairs,
+									 Indexer *itemIndexer, Indexer *solutionIndexer);
 
 
 /**
