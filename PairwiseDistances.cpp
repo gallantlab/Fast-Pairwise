@@ -164,35 +164,15 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 		{
 			double mean = 0.0;
 			meanSquares[i] = 0.0;
-			if (PyArray_ISCARRAY(itemArray))
+			for (unsigned int j = 0; j < numFeatures; j++)
+				mean += GET_2D_DOUBLE(itemArray, i, j);
+			mean /= (double)numFeatures;
+
+			for (unsigned int j = 0; j < numFeatures; j++)
 			{
-				double* v = (double*)PyArray_GETPTR2(itemArray, i, 0);
-
-				#pragma omp simd reduction(+:mean)
-				for (unsigned int j = 0; j < numFeatures; j++)
-					mean += v[j];
-				mean /= (double)numFeatures;
-
-				#pragma omp simd reduction(+:meanSquares[i])
-				for (unsigned int j = 0; j < numFeatures; j++)
-				{
-					double val = v[j] - mean;
-					rawDemeaned[i * numFeatures + j] = val;
-					meanSquares[i] += val * val;
-				}
-			}
-			else
-			{
-				for (unsigned int j = 0; j < numFeatures; j++)
-					mean += GET_2D_DOUBLE(itemArray, i, j);
-				mean /= (double)numFeatures;
-
-				for (unsigned int j = 0; j < numFeatures; j++)
-				{
-					double val = GET_2D_DOUBLE(itemArray, i, j) - mean;
-					rawDemeaned[i * numFeatures + j] = val;
-					meanSquares[i] += val * val;
-				}
+				double val = GET_2D_DOUBLE(itemArray, i, j) - mean;
+				rawDemeaned[i * numFeatures + j] = val;
+				meanSquares[i] += val * val;
 			}
 			meanSquares[i] /= (double)numFeatures;
 		}
@@ -360,7 +340,7 @@ static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args)
 	// is a large factorial that can exceed npy_intp, and thus it's easier to
 	// allocate the output in python first
 
-	if (!PyArg_ParseTuple(args, "OO|pp", &arg1, &arg2))    // "O" means object, 'p' means bool
+	if (!PyArg_ParseTuple(args, "OO", &arg1, &arg2))    // "O" means object, 'p' means bool
 		return nullptr;
 
 	// == Cast the generic python objects to Numpy array objects
@@ -433,7 +413,7 @@ static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args
 	// is a large factorial that can exceed npy_intp, and thus it's easier to
 	// allocate the output in python first
 
-	if (!PyArg_ParseTuple(args, "OO|pp", &arg1, &arg2))    // "O" means object, 'p' means bool
+	if (!PyArg_ParseTuple(args, "OO", &arg1, &arg2))    // "O" means object, 'p' means bool
 		return nullptr;
 
 	// == Cast the generic python objects to Numpy array objects
