@@ -129,16 +129,16 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
  * @param i				index of first item in pair
  * @param j				index of second item in pair
  * @param length		length of these vectors
- * @param meanSqaures	mean square of each entry, only used by Correlation, but shared for signature consistency in function pointer
+ * @param meanSquares	mean square of each entry, only used by Correlation, but shared for signature consistency in function pointer
  * @return	distance between the pairs
  */
 
 
-static double Euclidean(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
+static double Euclidean(PyArrayObject* items, int i, int j, int length, const double* meanSquares);
 
-static double RandomForest(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
+static double RandomForest(PyArrayObject* items, int i, int j, int length, const double* meanSquares);
 
-static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSqaures);
+static double Correlation(PyArrayObject* items, int i, int j, int length, const double* meanSquares);
 
 /**
  * Functions for AVX stuff that deals with different data types that necessitate the use of different vector sizes
