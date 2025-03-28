@@ -3,6 +3,8 @@ A dirty and barebones parallelized pairwise distance calculator as a replacement
 To install:
 ``python3 setup.py install --user``
 
+This *requires* a processor that supports AVX512 instructions, specifically AVX512F and AVX512BW sets.
+
 Currently provides correlation, euclidean, and random forest distances. 
 
 To use:
