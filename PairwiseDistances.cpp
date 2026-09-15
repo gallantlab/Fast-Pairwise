@@ -2,6 +2,8 @@
 #include "PairwiseIndexer.h"
 
 #include <iostream>
+#include <string>
+#include <ctype.h>
 #include <time.h>
 #include <boost/dynamic_bitset.hpp>
 #include <immintrin.h>
@@ -204,6 +206,105 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 
 
 	Py_RETURN_NONE;
+}
+
+static PyObject* Pdist(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+	static const char *keywords[] = {"X", "metric", "out", nullptr};
+	PyObject *X;
+	const char *metricArg = "euclidean";
+	PyObject *out = Py_None;
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|s$O", (char**)keywords, &X, &metricArg, &out))
+		return nullptr;
+
+	// scipy lowercases the metric name
+	std::string metric(metricArg);
+	for (size_t i = 0; i < metric.size(); i++)
+		metric[i] = (char)tolower(metric[i]);
+
+	PyCFunction distanceFunction = nullptr;
+	if (metric == "euclidean")
+		distanceFunction = &GetPairwiseEuclideanDistance;
+	else if (metric == "correlation")
+		distanceFunction = &GetPairwiseCorrelationDistance;
+	else if (metric == "randomforest")
+		distanceFunction = &GetPairwiseRandomForestDistance;
+	else if (metric == "clustering")
+		distanceFunction = &GetClusteringDistances;
+	else if (metric == "clusteringavx")
+		distanceFunction = &GetClusteringDistancesAVX;
+	else if (metric == "jaccard")
+		distanceFunction = &GetClusteringDistancesJaccardAVX;
+	else
+	{
+		PyErr_Format(PyExc_ValueError, "Unknown Distance Metric: %s", metricArg);
+		return nullptr;
+	}
+
+	// only the shape of X is needed here, the metric functions do their own type conversion
+	PyArrayObject *XArray = (PyArrayObject*)PyArray_FROM_O(X);
+	if (XArray == nullptr)
+		return nullptr;
+	if (PyArray_NDIM(XArray) != 2)
+	{
+		Py_DECREF(XArray);
+		PyErr_SetString(PyExc_ValueError, "A 2-dimensional array must be passed.");
+		return nullptr;
+	}
+	npy_intp m = PyArray_DIM(XArray, 0);
+	Py_DECREF(XArray);
+	npy_intp numCondensed = m * (m - 1) / 2;
+
+	if (out == Py_None)
+	{
+		out = PyArray_SimpleNew(1, &numCondensed, NPY_DOUBLE);
+		if (out == nullptr)
+			return nullptr;
+	}
+	else
+	{
+		// same checks as scipy so that distances are written into the caller's array rather than a copy
+		if (!PyArray_Check(out))
+		{
+			PyErr_SetString(PyExc_TypeError, "out must be a numpy array.");
+			return nullptr;
+		}
+		PyArrayObject *outArray = (PyArrayObject*)out;
+		if (PyArray_NDIM(outArray) != 1 || PyArray_DIM(outArray, 0) != numCondensed)
+		{
+			PyErr_SetString(PyExc_ValueError, "Output array has incorrect shape.");
+			return nullptr;
+		}
+		if (!PyArray_IS_C_CONTIGUOUS(outArray))
+		{
+			PyErr_SetString(PyExc_ValueError, "Output array must be C-contiguous.");
+			return nullptr;
+		}
+		if (PyArray_TYPE(outArray) != NPY_DOUBLE)
+		{
+			PyErr_SetString(PyExc_ValueError, "Output array must be double type.");
+			return nullptr;
+		}
+		Py_INCREF(out);
+	}
+
+	PyObject *metricArgs = Py_BuildValue("(OO)", X, out);
+	if (metricArgs == nullptr)
+	{
+		Py_DECREF(out);
+		return nullptr;
+	}
+	PyObject *result = distanceFunction(self, metricArgs);
+	Py_DECREF(metricArgs);
+	if (result == nullptr)
+	{
+		Py_DECREF(out);
+		return nullptr;
+	}
+	Py_DECREF(result);
+
+	return out;
 }
 
 static PyObject* GetClusteringDistance(PyObject *self, PyObject *args)
