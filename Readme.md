@@ -13,7 +13,7 @@ assuming `data` is a 2D numpy array in which the first index is samples and the 
 ````
 out = Pairwise.pdist(data, metric = "euclidean")
 ````
-`Pairwise.pdist` has the same signature as `scipy.spatial.distance.pdist`, `pdist(X, metric = "euclidean", *, out = None)`, and returns the condensed distance matrix. `metric` is one of `euclidean`, `correlation`, `randomforest`, `clustering`, `clusteringavx`, or `jaccard`. If `out` is given, it must be a C-contiguous float64 array of length `n * (n - 1) / 2` and the distances are written into it.
+`Pairwise.pdist` has the same signature as `scipy.spatial.distance.pdist`, `pdist(X, metric = "euclidean", *, out = None)`, and returns the condensed distance matrix. `metric` is `euclidean` or `correlation`. If `out` is given, it must be a C-contiguous float64 array of length `n * (n - 1) / 2` and the distances are written into it.
 
 The older functions are still available:
 ````

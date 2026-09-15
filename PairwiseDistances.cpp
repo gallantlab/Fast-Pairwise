@@ -235,14 +235,6 @@ static PyObject* Pdist(PyObject *self, PyObject *args, PyObject *kwargs)
 		distanceFunction = &GetPairwiseEuclideanDistance;
 	else if (metric == "correlation")
 		distanceFunction = &GetPairwiseCorrelationDistance;
-	else if (metric == "randomforest")
-		distanceFunction = &GetPairwiseRandomForestDistance;
-	else if (metric == "clustering")
-		distanceFunction = &GetClusteringDistances;
-	else if (metric == "clusteringavx")
-		distanceFunction = &GetClusteringDistancesAVX;
-	else if (metric == "jaccard")
-		distanceFunction = &GetClusteringDistancesJaccardAVX;
 	else
 	{
 		PyErr_Format(PyExc_ValueError, "Unknown Distance Metric: %s", metricArg);

@@ -62,7 +62,7 @@ static PyMethodDef PythonDistanceMethods[] =
 		 "Pairwise distances between observations in n-dimensional space, with the same signature as\n"
 		 "scipy.spatial.distance.pdist\n"
 		 "@param X:		an m by n array of m original observations in an n-dimensional space\n"
-		 "@param metric:	one of 'euclidean', 'correlation', 'randomforest', 'clustering', 'clusteringavx', 'jaccard'\n"
+		 "@param metric:	'euclidean' or 'correlation'\n"
 		 "@param out:	if not None, the condensed distance matrix is written into this array.\n"
 		 "			It must be a C-contiguous float64 array of shape (m * (m - 1) / 2,)\n"
 		 "@return:	a condensed distance matrix of length m * (m - 1) / 2\n"},
