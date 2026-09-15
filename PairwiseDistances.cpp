@@ -146,7 +146,12 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	PyArrayObject *outArray = (PyArrayObject*)PyArray_FROM_OTF(out, NPY_DOUBLE, NPY_ARRAY_OUT_ARRAY);
 
 	if (itemArray == nullptr || outArray == nullptr) // || sizeArray == nullptr)
+	{
+		Py_XDECREF(itemArray);
+		Py_XDECREF(outArray);
 		return nullptr;
+	}
+	PyArrayObject *inputArray = itemArray;	// kept so the converted input can be released
 	// get dimensions of the input array
 	npy_intp *dims = PyArray_DIMS(itemArray);
 	unsigned long long numItems = dims[0];
@@ -200,10 +205,12 @@ static PyObject* GetPairwiseDistance(PyObject *args, double (*DistanceFunction)(
 	if (DistanceFunction == &Correlation)
 	{
 		delete [] meanSquares;
-		itemArray->~tagPyArrayObject();
+		Py_DECREF(itemArray);	// does not own rawDemeaned
 		delete [] rawDemeaned;
 	}
 
+	Py_DECREF(inputArray);
+	Py_DECREF(outArray);
 
 	Py_RETURN_NONE;
 }
@@ -357,6 +364,9 @@ static PyObject* GetClusteringDistance(PyObject *self, PyObject *args)
 	if (normalize)
 		dist /= (double)numPairs;
 
+	Py_DECREF(solution1);
+	Py_DECREF(solution2);
+
 	return PyFloat_FromDouble(dist);
 }
 
@@ -429,6 +439,9 @@ static PyObject* GetClusteringDistances(PyObject *self, PyObject *args)
 
 	delete [] solutionPairs;
 
+	Py_DECREF(clusterSolutions);
+	Py_DECREF(clusterDistances);
+
 	Py_RETURN_NONE;
 }
 
@@ -446,7 +459,9 @@ static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args)
 
 	// == Cast the generic python objects to Numpy array objects
 	PyArrayObject* clusterSolutions;
-	int arrayType = PyArray_TYPE((PyArrayObject*)PyArray_FROM_O(arg1));
+	PyArrayObject* probe = (PyArrayObject*)PyArray_FROM_O(arg1);
+	int arrayType = PyArray_TYPE(probe);
+	Py_DECREF(probe);
 	switch (arrayType)
 	{
 		case NPY_UINT8:
@@ -464,6 +479,7 @@ static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args)
 
 	if (clusterSolutions == nullptr)
 	{
+		Py_XDECREF(clusterDistances);
 		PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
 		Py_RETURN_NONE;
 	}
@@ -503,6 +519,9 @@ static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args)
 	for (unsigned long long i = 0; i < numSolutionPairs; i++)
 		GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
 
+	Py_DECREF(clusterSolutions);
+	Py_DECREF(clusterDistances);
+
 	Py_RETURN_NONE;
 }
 
@@ -519,7 +538,9 @@ static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args
 
 	// == Cast the generic python objects to Numpy array objects
 	PyArrayObject* clusterSolutions;
-	int arrayType = PyArray_TYPE((PyArrayObject*)PyArray_FROM_O(arg1));
+	PyArrayObject* probe = (PyArrayObject*)PyArray_FROM_O(arg1);
+	int arrayType = PyArray_TYPE(probe);
+	Py_DECREF(probe);
 	switch (arrayType)
 	{
 		case NPY_UINT8:
@@ -537,6 +558,7 @@ static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args
 
 	if (clusterSolutions == nullptr)
 	{
+		Py_XDECREF(clusterDistances);
 		PyErr_SetString(PyExc_ValueError, "Cluster solutions need to be in uint8 or uint16");
 		Py_RETURN_NONE;
 	}
@@ -576,6 +598,9 @@ static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args
 	#pragma omp parallel for simd
 	for (unsigned long long i = 0; i < numSolutionPairs; i++)
 		GET_1D_DOUBLE(clusterDistances, i) /= (double)numItemPairs;
+
+	Py_DECREF(clusterSolutions);
+	Py_DECREF(clusterDistances);
 
 	Py_RETURN_NONE;
 }
