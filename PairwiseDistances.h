@@ -41,6 +41,15 @@ static PyObject* GetClusteringDistancesAVX(PyObject *self, PyObject *args);
 
 static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args);
 
+/**
+ * scipy.spatial.distance.pdist-style entry point
+ * @param self 		ignored
+ * @param args 		X and optionally metric
+ * @param kwargs	metric and out
+ * @return the condensed distance matrix
+ */
+static PyObject* Pdist(PyObject *self, PyObject *args, PyObject *kwargs);
+
 
 /**
  * Python module boilerplate
@@ -48,6 +57,16 @@ static PyObject* GetClusteringDistancesJaccardAVX(PyObject *self, PyObject *args
 
 static PyMethodDef PythonDistanceMethods[] =
 	{
+		{"pdist", (PyCFunction)(void(*)(void))&Pdist, METH_VARARGS | METH_KEYWORDS,
+		 "pdist(X, metric='euclidean', *, out=None)\n"
+		 "Pairwise distances between observations in n-dimensional space, with the same signature as\n"
+		 "scipy.spatial.distance.pdist\n"
+		 "@param X:		an m by n array of m original observations in an n-dimensional space\n"
+		 "@param metric:	'euclidean' or 'correlation'\n"
+		 "@param out:	if not None, the condensed distance matrix is written into this array.\n"
+		 "			It must be a C-contiguous float64 array of shape (m * (m - 1) / 2,)\n"
+		 "@return:	a condensed distance matrix of length m * (m - 1) / 2\n"},
+
 		{"GetPairwiseRandomForestDistance", &GetPairwiseRandomForestDistance, METH_VARARGS,
 		 "GetPairwiseRandomForestDistance(items, out)\n"
 		 "Gets the pairwise random forest distance between items, i.e. the fraction of the forest in which the pair of\n"
